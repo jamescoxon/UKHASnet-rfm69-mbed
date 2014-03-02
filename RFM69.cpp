@@ -13,8 +13,8 @@
 RFM69::RFM69(PinName slaveSelectPin, PinName mosi, PinName miso, PinName sclk, PinName interrupt)
     : _slaveSelectPin(slaveSelectPin),  _spi(mosi, miso, sclk), _interrupt(interrupt) /*, led1(LED1), led2(LED2), led3(LED3), led4(LED4) */
 {
-    _idleMode = RF69_MODE_RCON; // Default idle state is IDLE, with RC osc running, typ: 1.2uA
-    _mode = RF69_MODE_RX; // We start up in idle mode
+    _idleMode = RF69_MODE_SLEEP; // Default idle state is SLEEP, our lowest power mode
+    _mode = RF69_MODE_RX; // We start up in RX mode
     _rxGood = 0;
     _rxBad = 0;
     _txGood = 0;
@@ -29,39 +29,22 @@ boolean RFM69::init()
 
     wait_ms(100);
 
-    // Setup the spi for 8 bit data : 1RW-bit 7 adressbit and  8 databit
-    // second edge capture, with a 1MHz clock rate
     _spi.format(8,0);
-    _spi.frequency(1000000);
+    _spi.frequency(1000000); // 1MHz (increase to 10MHz after testing)
 
-    // Software reset the device
-    reset();
-
-    // Get the device type and check it
-    // This also tests whether we are really connected to a device
-    _deviceType = spiRead(RF22_REG_00_DEVICE_TYPE);
-    if (   _deviceType != RF22_DEVICE_TYPE_RX_TRX
-            && _deviceType != RF22_DEVICE_TYPE_TX)
-        return false;
-
-    // Set up Interrupt
+    // We should check for a device here, maybe set and check mode?
+    
     _interrupt.fall(this, &RFM69::isr0);
 
     clearTxBuf();
     clearRxBuf();
 
 
-    // Enable interrupts
-    0x25 RegDioMapping1 
-    0x26 RegDioMapping2
+    // Set up GPIOs
     spiWrite(RFM69_REG_25_DIO_MAPPING1, 0x00); // Set DIO Mapping to default
-
     spiWrite(RFM69_REG_26_DIO_MAPPING2, RFM69_CLKOUT_OFF); // Switch off Clkout
 
-
-    // Set some defaults. An innocuous ISM frequency, and reasonable pull-in
     setFrequency(869.5, 0.05);
-
 
     setModemConfig(FSK_Rb2_4Fd36);
     // Minimum power
@@ -82,6 +65,10 @@ void RFM69::handleInterrupt()
     
         // CRCOK (incoming packet)
         if(readReg(RFM69_REG_28_IRQFLAGS2) & RFM69_IRQFLAGS2_CRCOK) {
+            spiBurstRead(RFM69_REG_00_FIFO_ACCESS, _buf + _bufLen, len - _bufLen);
+            _rxGood++;
+            _bufLen = len;
+            _rxBufValid = true;
         
     // TX
     } else if(_mode == RFM69_MODE_TX) {
@@ -89,31 +76,8 @@ void RFM69::handleInterrupt()
         // PacketSent
         if(readReg(RFM69_REG_28_IRQFLAGS2) & RFM69_IRQFLAGS2_PACKETSENT) {
             _txGood++;
-            setMode(_afterTxMode); // IMPLEMENT THIS!!
+            setMode(_afterTxMode);
         }
-    }
-   
-    if (_lastInterruptFlags[0] & RF22_IPKVALID) {
-        uint8_t len = readReg(RFM69_REG_38_PAYLOADLENGTH);
-
-        // May have already read one or more fragments
-        // Get any remaining unread octets, based on the expected length
-        // First make sure we dont overflow the buffer in the case of a stupid length
-        // or partial bad receives
-        /*
-        if (len >  RF69_MAX_MESSAGE_LEN || len < _bufLen) {
-            _rxBad++;
-            //led2 = !led2;
-            _mode = RF22_MODE_IDLE;
-            clearRxBuf();
-            return; // Hmmm receiver buffer overflow.
-        }
-        */
-        spiBurstRead(RFM69_REG_00_FIFO_ACCESS, _buf + _bufLen, len - _bufLen);
-        _rxGood++;
-        _bufLen = len;
-        _mode = RF22_MODE_IDLE;
-        _rxBufValid = true;
     }
 }
 
@@ -168,51 +132,8 @@ void RFM69::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
         
     _slaveSelectPin = 1;
 }
-/*
-uint8_t RFM69::adcRead(uint8_t adcsel,
-                      uint8_t adcref ,
-                      uint8_t adcgain,
-                      uint8_t adcoffs)
-{
-    uint8_t configuration = adcsel | adcref | (adcgain & RF22_ADCGAIN);
-    spiWrite(RF22_REG_0F_ADC_CONFIGURATION, configuration | RF22_ADCSTART);
-    spiWrite(RF22_REG_10_ADC_SENSOR_AMP_OFFSET, adcoffs);
 
-    // Conversion time is nominally 305usec
-    // Wait for the DONE bit
-    while (!(spiRead(RF22_REG_0F_ADC_CONFIGURATION) & RF22_ADCDONE))
-        ;
-    // Return the value
-    return spiRead(RF22_REG_11_ADC_VALUE);
-}
-
-uint8_t RFM69::temperatureRead(uint8_t tsrange, uint8_t tvoffs)
-{
-    spiWrite(RF22_REG_12_TEMPERATURE_SENSOR_CALIBRATION, tsrange | RF22_ENTSOFFS);
-    spiWrite(RF22_REG_13_TEMPERATURE_VALUE_OFFSET, tvoffs);
-    return adcRead(RF22_ADCSEL_INTERNAL_TEMPERATURE_SENSOR | RF22_ADCREF_BANDGAP_VOLTAGE);
-}
-
-uint16_t RFM69::wutRead()
-{
-    uint8_t buf[2];
-    spiBurstRead(RF22_REG_17_WAKEUP_TIMER_VALUE1, buf, 2);
-    return ((uint16_t)buf[0] << 8) | buf[1]; // Dont rely on byte order
-}
-
-// RFM-22 doc appears to be wrong: WUT for wtm = 10000, r, = 0, d = 0 is about 1 sec
-void RF22::setWutPeriod(uint16_t wtm, uint8_t wtr, uint8_t wtd)
-{
-    uint8_t period[3];
-
-    period[0] = ((wtr & 0xf) << 2) | (wtd & 0x3);
-    period[1] = wtm >> 8;
-    period[2] = wtm & 0xff;
-    spiBurstWrite(RF22_REG_14_WAKEUP_TIMER_PERIOD1, period, sizeof(period));
-}
-*/
-
-uint8_t RFM69::rssiRead() // Converted
+uint8_t RFM69::rssiRead()
 {
     int rssi = 0;
     if (forceTrigger) {
@@ -227,8 +148,7 @@ uint8_t RFM69::rssiRead() // Converted
 
 void RFM69::setMode(uint8_t newMode) // Converted
 {
-    spiWrite(REG_OPMODE, (readReg(REG_OPMODE) & 0xE3) | newMode);
-
+    spiWrite(RFM69_REG_01_OPMODE, (readReg(RFM69_REG_01_OPMODE) & 0b11100011) | newMode);
 	_mode = newMode;
 }
 uint8_t  RFM69::mode()
