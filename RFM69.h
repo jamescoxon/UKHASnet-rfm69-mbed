@@ -19,15 +19,15 @@
 // 64 octets. We use interrupts to refill the Tx FIFO during transmission and to empty the
 // Rx FIFO during reception
 // Can be pre-defined to a smaller size (to save SRAM) prior to including this header
-#define RFM69_MAX_MESSAGE_LEN 65
+#define RFM69_MAX_MESSAGE_LEN 64
 
-// Max number of octets the RF22 Rx and Tx FIFOs can hold
+// Max number of octets the RFM69 FIFO can hold
 #define RFM69_FIFO_SIZE 64
 
-#define RFM69_MODE_SLEEP    0x00 0.1uA
-#define RFM69_MODE_STDBY    0x04 1.25mA
-#define RFM69_MODE_RX       0x10 16mA
-#define RFM69_MODE_TX       0x0c >=33mA
+#define RFM69_MODE_SLEEP    0x00 // 0.1uA
+#define RFM69_MODE_STDBY    0x04 // 1.25mA
+#define RFM69_MODE_RX       0x10 // 16mA
+#define RFM69_MODE_TX       0x0c // >33mA
 
 
 // These values we set for FIFO thresholds are actually the same as the POR values
@@ -35,90 +35,725 @@
 #define RF22_RXFFAFULL_THRESHOLD 55
 
 
-// Number of registers to be passed to setModemConfig()
-#define RF22_NUM_MODEM_CONFIG_REGS 18
-
 // Register names
-
 
 #define RFM69_REG_00_FIFO           0x00
 #define RFM69_REG_01_OPMODE         0x01
+#define RFM69_REG_02_DATA_MODUL     0x02
+#define RFM69_REG_03_BITRATE_MSB    0x03
+#define RFM69_REG_04_BITRATE_LSB    0x04
+#define RFM69_REG_05_FDEV_MSB       0x05
+#define RFM69_REG_06_FDEV_LSB       0x06
+#define RFM69_REG_07_FRF_MSB        0x07
+#define RFM69_REG_08_FRF_MID        0x08
+#define RFM69_REG_09_FRF_LSB        0x09
+#define RFM69_REG_0A_OSC1           0x0A
+#define RFM69_REG_0B_AFC_CTRL       0x0B
+#define RFM69_REG_0D_LISTEN1        0x0D
+#define RFM69_REG_0E_LISTEN2        0x0E
+#define RFM69_REG_0F_LISTEN3        0x0F
+#define RFM69_REG_10_VERSION        0x10 //Version and serial number
+#define RFM69_REG_11_PA_LEVEL       0x11
+#define RFM69_REG_12_PA_RAMP        0x12
+#define RFM69_REG_13_OCP            0x13
+#define RFM69_REG_18_LNA            0x18
+#define RFM69_REG_19_RX_BW          0x19
+#define RFM69_REG_1A_AFC_BW         0x1A
+#define RFM69_REG_1B_OOK_PEAK       0x1B
+#define RFM69_REG_1C_OOK_AVG        0x1C
+#define RFM69_REG_1D_OOF_FIX        0x1D
+#define RFM69_REG_1E_AFC_FEI        0x1E
+#define RFM69_REG_1F_AFC_MSB        0x1F
+#define RFM69_REG_20_AFC_LSB        0x20
+#define RFM69_REG_21_FEI_MSB        0x21
+#define RFM69_REG_22_FEI_LSB        0x22
 #define RFM69_REG_23_RSSI_CONFIG    0x23
 #define RFM69_REG_24_RSSI_VALUE     0x24
 #define RFM69_REG_25_DIO_MAPPING1   0x25
 #define RFM69_REG_26_DIO_MAPPING2   0x26
+#define RFM69_REG_27_IRQ_FLAGS1     0x27
+#define RFM69_REG_28_IRQ_FLAGS2     0x28
+#define RFM69_REG_29_RSSI_THRESHOLD 0x29
+#define RFM69_REG_2A_RX_TIMEOUT1    0x2A
+#define RFM69_REG_2B_RX_TIMEOUT2    0x2B
+#define RFM69_REG_2C_PREAMBLE_MSB   0x2C
+#define RFM69_REG_2D_PREAMBLE_LSB   0x2D
+#define RFM69_REG_2E_SYNC_CONFIG    0x2E
+// Sync values 1-8 go here
+#define RFM69_REG_37_PACKET_CONFIG1 0x37
+#define RFM69_REG_38_PAYLOAD_LENGTH 0x38
+// Node address, broadcast address go here
+#define RFM69_REG_3B_AUTOMODES      0x3B
+#define RFM69_REG_3C_FIFO_THRESHOLD 0x3C
+#define RFM69_REG_3D_PACKET_CONFIG2 0x3D
+// AES Key 1-16 go here
+#define RFM69_REG_4E_TEMP1          0x4E
+#define RFM69_REG_4F_TEMP2          0x4F
+#define RFM69_REG_58_TEST_LNA       0x58
+#define RFM69_REG_5A_TEST_PA1       0x5A
+#define RFM69_REG_5C_TEST_PA2       0x5C
+#define RFM69_REG_6F_TEST_DAGC      0x6F
+#define RFM69_REG_71_TEST_AFC       0x71
+
+//******************************************************
+// RF69/SX1231 bit control definition
+//******************************************************
+// RegOpMode
+#define RF_OPMODE_SEQUENCER_OFF				0x80
+#define RF_OPMODE_SEQUENCER_ON				0x00  // Default
+
+#define RF_OPMODE_LISTEN_ON						0x40
+#define RF_OPMODE_LISTEN_OFF					0x00  // Default
+
+#define RF_OPMODE_LISTENABORT					0x20
+
+#define RF_OPMODE_SLEEP							  0x00
+#define RF_OPMODE_STANDBY						  0x04  // Default
+#define RF_OPMODE_SYNTHESIZER					0x08
+#define RF_OPMODE_TRANSMITTER					0x0C
+#define RF_OPMODE_RECEIVER						0x10
+
+// RegDataModul
+#define RF_DATAMODUL_DATAMODE_PACKET			      0x00  // Default
+#define RF_DATAMODUL_DATAMODE_CONTINUOUS		    0x40
+#define RF_DATAMODUL_DATAMODE_CONTINUOUSNOBSYNC	0x60
+
+#define RF_DATAMODUL_MODULATIONTYPE_FSK			    0x00  // Default
+#define RF_DATAMODUL_MODULATIONTYPE_OOK			    0x08
+
+#define RF_DATAMODUL_MODULATIONSHAPING_00		    0x00  // Default
+#define RF_DATAMODUL_MODULATIONSHAPING_01		    0x01
+#define RF_DATAMODUL_MODULATIONSHAPING_10		    0x02
+#define RF_DATAMODUL_MODULATIONSHAPING_11		    0x03
+
+// RegOsc1
+#define RF_OSC1_RCCAL_START				0x80
+#define RF_OSC1_RCCAL_DONE				0x40
+
+// RegAfcCtrl
+#define RF_AFCLOWBETA_ON					0x20
+#define RF_AFCLOWBETA_OFF					0x00	// Default
+
+// RegLowBat
+#define RF_LOWBAT_MONITOR					0x10
+#define RF_LOWBAT_ON							0x08
+#define RF_LOWBAT_OFF							0x00  // Default
+
+#define RF_LOWBAT_TRIM_1695				0x00
+#define RF_LOWBAT_TRIM_1764				0x01
+#define RF_LOWBAT_TRIM_1835				0x02  // Default
+#define RF_LOWBAT_TRIM_1905				0x03
+#define RF_LOWBAT_TRIM_1976				0x04
+#define RF_LOWBAT_TRIM_2045				0x05
+#define RF_LOWBAT_TRIM_2116				0x06
+#define RF_LOWBAT_TRIM_2185				0x07
 
 
-class RF22
+// RegListen1
+#define RF_LISTEN1_RESOL_64				0x50
+#define RF_LISTEN1_RESOL_4100			0xA0  // Default
+#define RF_LISTEN1_RESOL_262000		0xF0
+
+#define RF_LISTEN1_CRITERIA_RSSI				  0x00  // Default
+#define RF_LISTEN1_CRITERIA_RSSIANDSYNC	  0x08
+
+#define RF_LISTEN1_END_00						      0x00
+#define RF_LISTEN1_END_01						      0x02  // Default
+#define RF_LISTEN1_END_10						      0x04
+
+
+// RegListen2
+#define RF_LISTEN2_COEFIDLE_VALUE				0xF5 // Default
+
+// RegListen3
+#define RF_LISTEN3_COEFRX_VALUE					0x20 // Default
+
+// RegPaLevel
+#define RF_PALEVEL_PA0_ON		  0x80  // Default
+#define RF_PALEVEL_PA0_OFF		0x00
+#define RF_PALEVEL_PA1_ON			0x40
+#define RF_PALEVEL_PA1_OFF		0x00  // Default
+#define RF_PALEVEL_PA2_ON			0x20
+#define RF_PALEVEL_PA2_OFF		0x00  // Default
+
+
+// RegPaRamp
+#define RF_PARAMP_3400						0x00
+#define RF_PARAMP_2000						0x01
+#define RF_PARAMP_1000						0x02
+#define RF_PARAMP_500							0x03
+#define RF_PARAMP_250							0x04
+#define RF_PARAMP_125							0x05
+#define RF_PARAMP_100							0x06
+#define RF_PARAMP_62							0x07
+#define RF_PARAMP_50							0x08
+#define RF_PARAMP_40							0x09  // Default
+#define RF_PARAMP_31							0x0A
+#define RF_PARAMP_25							0x0B
+#define RF_PARAMP_20							0x0C
+#define RF_PARAMP_15							0x0D
+#define RF_PARAMP_12							0x0E
+#define RF_PARAMP_10							0x0F
+
+
+// RegOcp
+#define RF_OCP_OFF								0x0F
+#define RF_OCP_ON								  0x1A  // Default
+
+#define RF_OCP_TRIM_45						0x00
+#define RF_OCP_TRIM_50						0x01
+#define RF_OCP_TRIM_55						0x02
+#define RF_OCP_TRIM_60						0x03
+#define RF_OCP_TRIM_65						0x04
+#define RF_OCP_TRIM_70						0x05
+#define RF_OCP_TRIM_75						0x06
+#define RF_OCP_TRIM_80						0x07
+#define RF_OCP_TRIM_85						0x08
+#define RF_OCP_TRIM_90						0x09
+#define RF_OCP_TRIM_95						0x0A
+#define RF_OCP_TRIM_100						0x0B  // Default
+#define RF_OCP_TRIM_105						0x0C
+#define RF_OCP_TRIM_110						0x0D
+#define RF_OCP_TRIM_115						0x0E
+#define RF_OCP_TRIM_120						0x0F
+
+
+// RegAgcRef
+#define RF_AGCREF_AUTO_ON					0x40  // Default
+#define RF_AGCREF_AUTO_OFF				0x00
+
+#define RF_AGCREF_LEVEL_MINUS80		0x00  // Default
+#define RF_AGCREF_LEVEL_MINUS81		0x01
+#define RF_AGCREF_LEVEL_MINUS82		0x02
+#define RF_AGCREF_LEVEL_MINUS83		0x03
+#define RF_AGCREF_LEVEL_MINUS84		0x04
+#define RF_AGCREF_LEVEL_MINUS85		0x05
+#define RF_AGCREF_LEVEL_MINUS86		0x06
+#define RF_AGCREF_LEVEL_MINUS87		0x07
+#define RF_AGCREF_LEVEL_MINUS88		0x08
+#define RF_AGCREF_LEVEL_MINUS89		0x09
+#define RF_AGCREF_LEVEL_MINUS90		0x0A
+#define RF_AGCREF_LEVEL_MINUS91		0x0B
+#define RF_AGCREF_LEVEL_MINUS92		0x0C
+#define RF_AGCREF_LEVEL_MINUS93		0x0D
+#define RF_AGCREF_LEVEL_MINUS94		0x0E
+#define RF_AGCREF_LEVEL_MINUS95		0x0F
+#define RF_AGCREF_LEVEL_MINUS96		0x10
+#define RF_AGCREF_LEVEL_MINUS97		0x11
+#define RF_AGCREF_LEVEL_MINUS98		0x12
+#define RF_AGCREF_LEVEL_MINUS99		0x13
+#define RF_AGCREF_LEVEL_MINUS100	0x14
+#define RF_AGCREF_LEVEL_MINUS101	0x15
+#define RF_AGCREF_LEVEL_MINUS102	0x16
+#define RF_AGCREF_LEVEL_MINUS103	0x17
+#define RF_AGCREF_LEVEL_MINUS104	0x18
+#define RF_AGCREF_LEVEL_MINUS105	0x19
+#define RF_AGCREF_LEVEL_MINUS106	0x1A
+#define RF_AGCREF_LEVEL_MINUS107	0x1B
+#define RF_AGCREF_LEVEL_MINUS108	0x1C
+#define RF_AGCREF_LEVEL_MINUS109	0x1D
+#define RF_AGCREF_LEVEL_MINUS110	0x1E
+#define RF_AGCREF_LEVEL_MINUS111	0x1F
+#define RF_AGCREF_LEVEL_MINUS112	0x20
+#define RF_AGCREF_LEVEL_MINUS113	0x21
+#define RF_AGCREF_LEVEL_MINUS114	0x22
+#define RF_AGCREF_LEVEL_MINUS115	0x23
+#define RF_AGCREF_LEVEL_MINUS116	0x24
+#define RF_AGCREF_LEVEL_MINUS117	0x25
+#define RF_AGCREF_LEVEL_MINUS118	0x26
+#define RF_AGCREF_LEVEL_MINUS119	0x27
+#define RF_AGCREF_LEVEL_MINUS120	0x28
+#define RF_AGCREF_LEVEL_MINUS121	0x29
+#define RF_AGCREF_LEVEL_MINUS122	0x2A
+#define RF_AGCREF_LEVEL_MINUS123	0x2B
+#define RF_AGCREF_LEVEL_MINUS124	0x2C
+#define RF_AGCREF_LEVEL_MINUS125	0x2D
+#define RF_AGCREF_LEVEL_MINUS126	0x2E
+#define RF_AGCREF_LEVEL_MINUS127	0x2F
+#define RF_AGCREF_LEVEL_MINUS128	0x30
+#define RF_AGCREF_LEVEL_MINUS129	0x31
+#define RF_AGCREF_LEVEL_MINUS130	0x32
+#define RF_AGCREF_LEVEL_MINUS131	0x33
+#define RF_AGCREF_LEVEL_MINUS132	0x34
+#define RF_AGCREF_LEVEL_MINUS133	0x35
+#define RF_AGCREF_LEVEL_MINUS134	0x36
+#define RF_AGCREF_LEVEL_MINUS135	0x37
+#define RF_AGCREF_LEVEL_MINUS136	0x38
+#define RF_AGCREF_LEVEL_MINUS137	0x39
+#define RF_AGCREF_LEVEL_MINUS138	0x3A
+#define RF_AGCREF_LEVEL_MINUS139	0x3B
+#define RF_AGCREF_LEVEL_MINUS140	0x3C
+#define RF_AGCREF_LEVEL_MINUS141	0x3D
+#define RF_AGCREF_LEVEL_MINUS142	0x3E
+#define RF_AGCREF_LEVEL_MINUS143	0x3F
+
+
+// RegAgcThresh1
+#define RF_AGCTHRESH1_SNRMARGIN_000		0x00
+#define RF_AGCTHRESH1_SNRMARGIN_001		0x20
+#define RF_AGCTHRESH1_SNRMARGIN_010		0x40
+#define RF_AGCTHRESH1_SNRMARGIN_011		0x60
+#define RF_AGCTHRESH1_SNRMARGIN_100		0x80
+#define RF_AGCTHRESH1_SNRMARGIN_101		0xA0  // Default
+#define RF_AGCTHRESH1_SNRMARGIN_110		0xC0
+#define RF_AGCTHRESH1_SNRMARGIN_111		0xE0
+
+#define RF_AGCTHRESH1_STEP1_0					0x00
+#define RF_AGCTHRESH1_STEP1_1					0x01
+#define RF_AGCTHRESH1_STEP1_2					0x02
+#define RF_AGCTHRESH1_STEP1_3					0x03
+#define RF_AGCTHRESH1_STEP1_4					0x04
+#define RF_AGCTHRESH1_STEP1_5					0x05
+#define RF_AGCTHRESH1_STEP1_6					0x06
+#define RF_AGCTHRESH1_STEP1_7					0x07
+#define RF_AGCTHRESH1_STEP1_8					0x08
+#define RF_AGCTHRESH1_STEP1_9					0x09
+#define RF_AGCTHRESH1_STEP1_10				0x0A
+#define RF_AGCTHRESH1_STEP1_11				0x0B
+#define RF_AGCTHRESH1_STEP1_12				0x0C
+#define RF_AGCTHRESH1_STEP1_13				0x0D
+#define RF_AGCTHRESH1_STEP1_14				0x0E
+#define RF_AGCTHRESH1_STEP1_15				0x0F
+#define RF_AGCTHRESH1_STEP1_16				0x10  // Default
+#define RF_AGCTHRESH1_STEP1_17				0x11
+#define RF_AGCTHRESH1_STEP1_18				0x12
+#define RF_AGCTHRESH1_STEP1_19				0x13
+#define RF_AGCTHRESH1_STEP1_20				0x14
+#define RF_AGCTHRESH1_STEP1_21				0x15
+#define RF_AGCTHRESH1_STEP1_22				0x16
+#define RF_AGCTHRESH1_STEP1_23				0x17
+#define RF_AGCTHRESH1_STEP1_24				0x18
+#define RF_AGCTHRESH1_STEP1_25				0x19
+#define RF_AGCTHRESH1_STEP1_26				0x1A
+#define RF_AGCTHRESH1_STEP1_27				0x1B
+#define RF_AGCTHRESH1_STEP1_28				0x1C
+#define RF_AGCTHRESH1_STEP1_29				0x1D
+#define RF_AGCTHRESH1_STEP1_30				0x1E
+#define RF_AGCTHRESH1_STEP1_31				0x1F
+
+
+// RegAgcThresh2
+#define RF_AGCTHRESH2_STEP2_0					0x00
+#define RF_AGCTHRESH2_STEP2_1					0x10
+#define RF_AGCTHRESH2_STEP2_2					0x20
+#define RF_AGCTHRESH2_STEP2_3					0x30  // XXX wrong -- Default
+#define RF_AGCTHRESH2_STEP2_4					0x40
+#define RF_AGCTHRESH2_STEP2_5					0x50
+#define RF_AGCTHRESH2_STEP2_6					0x60
+#define RF_AGCTHRESH2_STEP2_7					0x70	// default
+#define RF_AGCTHRESH2_STEP2_8					0x80
+#define RF_AGCTHRESH2_STEP2_9					0x90
+#define RF_AGCTHRESH2_STEP2_10				0xA0
+#define RF_AGCTHRESH2_STEP2_11				0xB0
+#define RF_AGCTHRESH2_STEP2_12				0xC0
+#define RF_AGCTHRESH2_STEP2_13				0xD0
+#define RF_AGCTHRESH2_STEP2_14				0xE0
+#define RF_AGCTHRESH2_STEP2_15				0xF0
+
+#define RF_AGCTHRESH2_STEP3_0					0x00
+#define RF_AGCTHRESH2_STEP3_1					0x01
+#define RF_AGCTHRESH2_STEP3_2					0x02
+#define RF_AGCTHRESH2_STEP3_3					0x03
+#define RF_AGCTHRESH2_STEP3_4					0x04
+#define RF_AGCTHRESH2_STEP3_5					0x05
+#define RF_AGCTHRESH2_STEP3_6					0x06
+#define RF_AGCTHRESH2_STEP3_7					0x07
+#define RF_AGCTHRESH2_STEP3_8					0x08
+#define RF_AGCTHRESH2_STEP3_9					0x09
+#define RF_AGCTHRESH2_STEP3_10				0x0A
+#define RF_AGCTHRESH2_STEP3_11				0x0B  // Default
+#define RF_AGCTHRESH2_STEP3_12				0x0C
+#define RF_AGCTHRESH2_STEP3_13				0x0D
+#define RF_AGCTHRESH2_STEP3_14				0x0E
+#define RF_AGCTHRESH2_STEP3_15				0x0F
+
+
+// RegAgcThresh3
+#define RF_AGCTHRESH3_STEP4_0					0x00
+#define RF_AGCTHRESH3_STEP4_1					0x10
+#define RF_AGCTHRESH3_STEP4_2					0x20
+#define RF_AGCTHRESH3_STEP4_3					0x30
+#define RF_AGCTHRESH3_STEP4_4					0x40
+#define RF_AGCTHRESH3_STEP4_5					0x50
+#define RF_AGCTHRESH3_STEP4_6					0x60
+#define RF_AGCTHRESH3_STEP4_7					0x70
+#define RF_AGCTHRESH3_STEP4_8					0x80
+#define RF_AGCTHRESH3_STEP4_9					0x90  // Default
+#define RF_AGCTHRESH3_STEP4_10				0xA0
+#define RF_AGCTHRESH3_STEP4_11				0xB0
+#define RF_AGCTHRESH3_STEP4_12				0xC0
+#define RF_AGCTHRESH3_STEP4_13				0xD0
+#define RF_AGCTHRESH3_STEP4_14				0xE0
+#define RF_AGCTHRESH3_STEP4_15				0xF0
+
+#define RF_AGCTHRESH3_STEP5_0					0x00
+#define RF_AGCTHRESH3_STEP5_1					0x01
+#define RF_AGCTHRESH3_STEP5_2					0x02
+#define RF_AGCTHRESH3_STEP5_3					0x03
+#define RF_AGCTHRESH3_STEP5_4					0x04
+#define RF_AGCTHRESH3_STEP5_5					0x05
+#define RF_AGCTHRESH3_STEP5_6					0x06
+#define RF_AGCTHRESH3_STEP5_7					0x07
+#define RF_AGCTHRES33_STEP5_8					0x08
+#define RF_AGCTHRESH3_STEP5_9					0x09
+#define RF_AGCTHRESH3_STEP5_10				0x0A
+#define RF_AGCTHRESH3_STEP5_11				0x0B  // Default
+#define RF_AGCTHRESH3_STEP5_12				0x0C
+#define RF_AGCTHRESH3_STEP5_13				0x0D
+#define RF_AGCTHRESH3_STEP5_14				0x0E
+#define RF_AGCTHRESH3_STEP5_15				0x0F
+
+
+// RegLna
+#define RF_LNA_ZIN_50							    0x00
+#define RF_LNA_ZIN_200							  0x80  // Default
+
+#define RF_LNA_LOWPOWER_OFF						0x00  // Default
+#define RF_LNA_LOWPOWER_ON						0x40
+
+#define RF_LNA_CURRENTGAIN						0x38
+
+#define RF_LNA_GAINSELECT_AUTO				0x00  // Default
+#define RF_LNA_GAINSELECT_MAX					0x01
+#define RF_LNA_GAINSELECT_MAXMINUS6		0x02
+#define RF_LNA_GAINSELECT_MAXMINUS12	0x03
+#define RF_LNA_GAINSELECT_MAXMINUS24	0x04
+#define RF_LNA_GAINSELECT_MAXMINUS36	0x05
+#define RF_LNA_GAINSELECT_MAXMINUS48	0x06
+
+
+// RegRxBw
+#define RF_RXBW_DCCFREQ_000						0x00
+#define RF_RXBW_DCCFREQ_001						0x20
+#define RF_RXBW_DCCFREQ_010						0x40  // Default
+#define RF_RXBW_DCCFREQ_011						0x60
+#define RF_RXBW_DCCFREQ_100						0x80
+#define RF_RXBW_DCCFREQ_101						0xA0
+#define RF_RXBW_DCCFREQ_110						0xC0
+#define RF_RXBW_DCCFREQ_111						0xE0
+
+#define RF_RXBW_MANT_16							  0x00
+#define RF_RXBW_MANT_20							  0x08
+#define RF_RXBW_MANT_24							  0x10  // Default
+
+#define RF_RXBW_EXP_0							    0x00
+#define RF_RXBW_EXP_1		  			  		0x01
+#define RF_RXBW_EXP_2			  	  			0x02
+#define RF_RXBW_EXP_3				    			0x03
+#define RF_RXBW_EXP_4			  		  		0x04
+#define RF_RXBW_EXP_5		  				  	0x05  // Default
+#define RF_RXBW_EXP_6	  						  0x06
+#define RF_RXBW_EXP_7						  	  0x07
+
+
+// RegAfcBw
+#define RF_AFCBW_DCCFREQAFC_000				0x00
+#define RF_AFCBW_DCCFREQAFC_001				0x20
+#define RF_AFCBW_DCCFREQAFC_010				0x40
+#define RF_AFCBW_DCCFREQAFC_011				0x60
+#define RF_AFCBW_DCCFREQAFC_100				0x80  // Default
+#define RF_AFCBW_DCCFREQAFC_101				0xA0
+#define RF_AFCBW_DCCFREQAFC_110				0xC0
+#define RF_AFCBW_DCCFREQAFC_111				0xE0
+
+#define RF_AFCBW_MANTAFC_16						0x00
+#define RF_AFCBW_MANTAFC_20						0x08  // Default
+#define RF_AFCBW_MANTAFC_24						0x10
+
+#define RF_AFCBW_EXPAFC_0						  0x00
+#define RF_AFCBW_EXPAFC_1	  					0x01
+#define RF_AFCBW_EXPAFC_2		  				0x02
+#define RF_AFCBW_EXPAFC_3			  			0x03  // Default
+#define RF_AFCBW_EXPAFC_4				  		0x04
+#define RF_AFCBW_EXPAFC_5					  	0x05
+#define RF_AFCBW_EXPAFC_6						  0x06
+#define RF_AFCBW_EXPAFC_7					  	0x07
+
+
+// RegOokPeak
+#define RF_OOKPEAK_THRESHTYPE_FIXED				0x00
+#define RF_OOKPEAK_THRESHTYPE_PEAK				0x40  // Default
+#define RF_OOKPEAK_THRESHTYPE_AVERAGE			0x80
+
+#define RF_OOKPEAK_PEAKTHRESHSTEP_000			0x00  // Default
+#define RF_OOKPEAK_PEAKTHRESHSTEP_001			0x08
+#define RF_OOKPEAK_PEAKTHRESHSTEP_010			0x10
+#define RF_OOKPEAK_PEAKTHRESHSTEP_011			0x18
+#define RF_OOKPEAK_PEAKTHRESHSTEP_100			0x20
+#define RF_OOKPEAK_PEAKTHRESHSTEP_101			0x28
+#define RF_OOKPEAK_PEAKTHRESHSTEP_110			0x30
+#define RF_OOKPEAK_PEAKTHRESHSTEP_111			0x38
+
+#define RF_OOKPEAK_PEAKTHRESHDEC_000			0x00  // Default
+#define RF_OOKPEAK_PEAKTHRESHDEC_001			0x01
+#define RF_OOKPEAK_PEAKTHRESHDEC_010			0x02
+#define RF_OOKPEAK_PEAKTHRESHDEC_011			0x03
+#define RF_OOKPEAK_PEAKTHRESHDEC_100			0x04
+#define RF_OOKPEAK_PEAKTHRESHDEC_101			0x05
+#define RF_OOKPEAK_PEAKTHRESHDEC_110			0x06
+#define RF_OOKPEAK_PEAKTHRESHDEC_111			0x07
+
+
+// RegOokAvg
+#define RF_OOKAVG_AVERAGETHRESHFILT_00		0x00
+#define RF_OOKAVG_AVERAGETHRESHFILT_01		0x40
+#define RF_OOKAVG_AVERAGETHRESHFILT_10		0x80  // Default
+#define RF_OOKAVG_AVERAGETHRESHFILT_11		0xC0
+
+
+// RegOokFix
+#define RF_OOKFIX_FIXEDTHRESH_VALUE				0x06  // Default
+
+
+// RegAfcFei
+#define RF_AFCFEI_FEI_DONE						    0x40
+#define RF_AFCFEI_FEI_START						    0x20
+#define RF_AFCFEI_AFC_DONE						    0x10
+#define RF_AFCFEI_AFCAUTOCLEAR_ON			  	0x08
+#define RF_AFCFEI_AFCAUTOCLEAR_OFF				0x00  // Default
+
+#define RF_AFCFEI_AFCAUTO_ON					    0x04
+#define RF_AFCFEI_AFCAUTO_OFF					    0x00  // Default
+
+#define RF_AFCFEI_AFC_CLEAR						    0x02
+#define RF_AFCFEI_AFC_START						    0x01
+
+// RegRssiConfig
+#define RF_RSSI_FASTRX_ON						      0x08
+#define RF_RSSI_FASTRX_OFF						    0x00  // Default
+#define RF_RSSI_DONE							        0x02
+#define RF_RSSI_START							        0x01
+
+
+// RegDioMapping1
+#define RF_DIOMAPPING1_DIO0_00	  				0x00  // Default
+#define RF_DIOMAPPING1_DIO0_01		  			0x40
+#define RF_DIOMAPPING1_DIO0_10			  		0x80
+#define RF_DIOMAPPING1_DIO0_11				  	0xC0
+
+#define RF_DIOMAPPING1_DIO1_00   					0x00  // Default
+#define RF_DIOMAPPING1_DIO1_01		  			0x10
+#define RF_DIOMAPPING1_DIO1_10			  		0x20
+#define RF_DIOMAPPING1_DIO1_11				  	0x30
+
+#define RF_DIOMAPPING1_DIO2_00	  				0x00  // Default
+#define RF_DIOMAPPING1_DIO2_01		  			0x04
+#define RF_DIOMAPPING1_DIO2_10			  		0x08
+#define RF_DIOMAPPING1_DIO2_11				  	0x0C
+
+#define RF_DIOMAPPING1_DIO3_00	  				0x00  // Default
+#define RF_DIOMAPPING1_DIO3_01		  			0x01
+#define RF_DIOMAPPING1_DIO3_10			  		0x02
+#define RF_DIOMAPPING1_DIO3_11				  	0x03
+
+
+// RegDioMapping2
+#define RF_DIOMAPPING2_DIO4_00	  				0x00  // Default
+#define RF_DIOMAPPING2_DIO4_01		  			0x40
+#define RF_DIOMAPPING2_DIO4_10			  		0x80
+#define RF_DIOMAPPING2_DIO4_11				  	0xC0
+
+#define RF_DIOMAPPING2_DIO5_00	  				0x00  // Default
+#define RF_DIOMAPPING2_DIO5_01		  			0x10
+#define RF_DIOMAPPING2_DIO5_10			  		0x20
+#define RF_DIOMAPPING2_DIO5_11				  	0x30
+
+#define RF_DIOMAPPING2_CLKOUT_32	  			0x00
+#define RF_DIOMAPPING2_CLKOUT_16		  		0x01
+#define RF_DIOMAPPING2_CLKOUT_8				  	0x02
+#define RF_DIOMAPPING2_CLKOUT_4					  0x03
+#define RF_DIOMAPPING2_CLKOUT_2		  			0x04
+#define RF_DIOMAPPING2_CLKOUT_1			  		0x05
+#define RF_DIOMAPPING2_CLKOUT_RC			  	0x06
+#define RF_DIOMAPPING2_CLKOUT_OFF				  0x07  // Default
+
+
+// RegIrqFlags1
+#define RF_IRQFLAGS1_MODEREADY					  0x80
+#define RF_IRQFLAGS1_RXREADY					    0x40
+#define RF_IRQFLAGS1_TXREADY					    0x20
+#define RF_IRQFLAGS1_PLLLOCK					    0x10
+#define RF_IRQFLAGS1_RSSI						      0x08
+#define RF_IRQFLAGS1_TIMEOUT					    0x04
+#define RF_IRQFLAGS1_AUTOMODE					    0x02
+#define RF_IRQFLAGS1_SYNCADDRESSMATCH			0x01
+
+// RegIrqFlags2
+#define RF_IRQFLAGS2_FIFOFULL					    0x80
+#define RF_IRQFLAGS2_FIFONOTEMPTY				  0x40
+#define RF_IRQFLAGS2_FIFOLEVEL					  0x20
+#define RF_IRQFLAGS2_FIFOOVERRUN				  0x10
+#define RF_IRQFLAGS2_PACKETSENT					  0x08
+#define RF_IRQFLAGS2_PAYLOADREADY				  0x04
+#define RF_IRQFLAGS2_CRCOK						    0x02
+#define RF_IRQFLAGS2_LOWBAT						    0x01
+
+// RegRssiThresh
+#define RF_RSSITHRESH_VALUE						    0xE4  // Default
+
+// RegRxTimeout1
+#define RF_RXTIMEOUT1_RXSTART_VALUE				0x00  // Default
+
+// RegRxTimeout2
+#define RF_RXTIMEOUT2_RSSITHRESH_VALUE		0x00  // Default
+
+// RegPreamble
+#define RF_PREAMBLESIZE_MSB_VALUE				  0x00  // Default
+#define RF_PREAMBLESIZE_LSB_VALUE				  0x03  // Default
+
+
+// RegSyncConfig
+#define RF_SYNC_ON								0x80  // Default
+#define RF_SYNC_OFF								0x00
+
+#define RF_SYNC_FIFOFILL_AUTO			0x00  // Default -- when sync interrupt occurs
+#define RF_SYNC_FIFOFILL_MANUAL		0x40
+
+#define RF_SYNC_SIZE_1						0x00
+#define RF_SYNC_SIZE_2						0x08
+#define RF_SYNC_SIZE_3						0x10
+#define RF_SYNC_SIZE_4						0x18  // Default
+#define RF_SYNC_SIZE_5						0x20
+#define RF_SYNC_SIZE_6						0x28
+#define RF_SYNC_SIZE_7						0x30
+#define RF_SYNC_SIZE_8						0x38
+
+#define RF_SYNC_TOL_0							0x00  // Default
+#define RF_SYNC_TOL_1							0x01
+#define RF_SYNC_TOL_2							0x02
+#define RF_SYNC_TOL_3							0x03
+#define RF_SYNC_TOL_4							0x04
+#define RF_SYNC_TOL_5							0x05
+#define RF_SYNC_TOL_6							0x06
+#define RF_SYNC_TOL_7							0x07
+
+
+// RegSyncValue1-8
+#define RF_SYNC_BYTE1_VALUE				0x00  // Default
+#define RF_SYNC_BYTE2_VALUE				0x00  // Default
+#define RF_SYNC_BYTE3_VALUE				0x00  // Default
+#define RF_SYNC_BYTE4_VALUE				0x00  // Default
+#define RF_SYNC_BYTE5_VALUE				0x00  // Default
+#define RF_SYNC_BYTE6_VALUE				0x00  // Default
+#define RF_SYNC_BYTE7_VALUE				0x00  // Default
+#define RF_SYNC_BYTE8_VALUE				0x00  // Default
+
+
+// RegPacketConfig1
+#define RF_PACKET1_FORMAT_FIXED				0x00  // Default
+#define RF_PACKET1_FORMAT_VARIABLE		0x80
+
+#define RF_PACKET1_DCFREE_OFF					0x00  // Default
+#define RF_PACKET1_DCFREE_MANCHESTER	0x20
+#define RF_PACKET1_DCFREE_WHITENING		0x40
+
+#define RF_PACKET1_CRC_ON						  0x10  // Default
+#define RF_PACKET1_CRC_OFF						0x00
+
+#define RF_PACKET1_CRCAUTOCLEAR_ON		0x00  // Default
+#define RF_PACKET1_CRCAUTOCLEAR_OFF		0x08
+
+#define RF_PACKET1_ADRSFILTERING_OFF			      0x00  // Default
+#define RF_PACKET1_ADRSFILTERING_NODE			      0x02
+#define RF_PACKET1_ADRSFILTERING_NODEBROADCAST	0x04
+
+
+// RegPayloadLength
+#define RF_PAYLOADLENGTH_VALUE					0x40  // Default
+
+// RegBroadcastAdrs
+#define RF_BROADCASTADDRESS_VALUE				0x00
+
+
+// RegAutoModes
+#define RF_AUTOMODES_ENTER_OFF					      0x00  // Default
+#define RF_AUTOMODES_ENTER_FIFONOTEMPTY			  0x20
+#define RF_AUTOMODES_ENTER_FIFOLEVEL			    0x40
+#define RF_AUTOMODES_ENTER_CRCOK				      0x60
+#define RF_AUTOMODES_ENTER_PAYLOADREADY			  0x80
+#define RF_AUTOMODES_ENTER_SYNCADRSMATCH		  0xA0
+#define RF_AUTOMODES_ENTER_PACKETSENT			    0xC0
+#define RF_AUTOMODES_ENTER_FIFOEMPTY			    0xE0
+
+#define RF_AUTOMODES_EXIT_OFF					        0x00  // Default
+#define RF_AUTOMODES_EXIT_FIFOEMPTY		  		  0x04
+#define RF_AUTOMODES_EXIT_FIFOLEVEL	  			  0x08
+#define RF_AUTOMODES_EXIT_CRCOK					      0x0C
+#define RF_AUTOMODES_EXIT_PAYLOADREADY		  	0x10
+#define RF_AUTOMODES_EXIT_SYNCADRSMATCH			  0x14
+#define RF_AUTOMODES_EXIT_PACKETSENT		  	  0x18
+#define RF_AUTOMODES_EXIT_RXTIMEOUT				    0x1C
+
+#define RF_AUTOMODES_INTERMEDIATE_SLEEP			  0x00  // Default
+#define RF_AUTOMODES_INTERMEDIATE_STANDBY		  0x01
+#define RF_AUTOMODES_INTERMEDIATE_RECEIVER		0x02
+#define RF_AUTOMODES_INTERMEDIATE_TRANSMITTER	0x03
+
+
+// RegFifoThresh
+#define RF_FIFOTHRESH_TXSTART_FIFOTHRESH		  0x00
+#define RF_FIFOTHRESH_TXSTART_FIFONOTEMPTY		0x80  // Default
+
+#define RF_FIFOTHRESH_VALUE						        0x0F  // Default
+
+
+// RegPacketConfig2
+#define RF_PACKET2_RXRESTARTDELAY_1BIT			  0x00  // Default
+#define RF_PACKET2_RXRESTARTDELAY_2BITS			  0x10
+#define RF_PACKET2_RXRESTARTDELAY_4BITS	  		0x20
+#define RF_PACKET2_RXRESTARTDELAY_8BITS		  	0x30
+#define RF_PACKET2_RXRESTARTDELAY_16BITS		  0x40
+#define RF_PACKET2_RXRESTARTDELAY_32BITS  		0x50
+#define RF_PACKET2_RXRESTARTDELAY_64BITS	  	0x60
+#define RF_PACKET2_RXRESTARTDELAY_128BITS		  0x70
+#define RF_PACKET2_RXRESTARTDELAY_256BITS 		0x80
+#define RF_PACKET2_RXRESTARTDELAY_512BITS	  	0x90
+#define RF_PACKET2_RXRESTARTDELAY_1024BITS		0xA0
+#define RF_PACKET2_RXRESTARTDELAY_2048BITS		0xB0
+#define RF_PACKET2_RXRESTARTDELAY_NONE			  0xC0
+#define RF_PACKET2_RXRESTART					        0x04
+
+#define RF_PACKET2_AUTORXRESTART_ON				    0x02  // Default
+#define RF_PACKET2_AUTORXRESTART_OFF			    0x00
+
+#define RF_PACKET2_AES_ON						          0x01
+#define RF_PACKET2_AES_OFF						        0x00  // Default
+
+
+// RegAesKey1-16
+#define RF_AESKEY1_VALUE						0x00  // Default
+#define RF_AESKEY2_VALUE						0x00  // Default
+#define RF_AESKEY3_VALUE						0x00  // Default
+#define RF_AESKEY4_VALUE						0x00  // Default
+#define RF_AESKEY5_VALUE						0x00  // Default
+#define RF_AESKEY6_VALUE						0x00  // Default
+#define RF_AESKEY7_VALUE						0x00  // Default
+#define RF_AESKEY8_VALUE						0x00  // Default
+#define RF_AESKEY9_VALUE						0x00  // Default
+#define RF_AESKEY10_VALUE						0x00  // Default
+#define RF_AESKEY11_VALUE						0x00  // Default
+#define RF_AESKEY12_VALUE						0x00  // Default
+#define RF_AESKEY13_VALUE						0x00  // Default
+#define RF_AESKEY14_VALUE						0x00  // Default
+#define RF_AESKEY15_VALUE						0x00  // Default
+#define RF_AESKEY16_VALUE						0x00  // Default
+
+
+// RegTemp1
+#define RF_TEMP1_MEAS_START					0x08
+#define RF_TEMP1_MEAS_RUNNING				0x04
+#define RF_TEMP1_ADCLOWPOWER_ON			0x01  // Default
+#define RF_TEMP1_ADCLOWPOWER_OFF		0x00
+
+// RegTestDagc
+#define RF_DAGC_NORMAL              0x00  // Reset value
+#define RF_DAGC_IMPROVED_LOWBETA1   0x20  //
+#define RF_DAGC_IMPROVED_LOWBETA0   0x30  // Recommended default
+
+
+class RFM69
 {
 public:
-
-    /// \brief Defines register values for a set of modem configuration registers
-    ///
-    /// Defines register values for a set of modem configuration registers
-    /// that can be passed to setModemConfig()
-    /// if none of the choices in ModemConfigChoice suit your need
-    /// setModemConfig() writes the register values to the appropriate RF22 registers
-    /// to set the desired modulation type, data rate and deviation/bandwidth.
-    /// Suitable values for these registers can be computed using the register calculator at
-    /// http://www.hoperf.com/upload/rf/RF22B%2023B%2031B%2042B%2043B%20Register%20Settings_RevB1-v5.xls
-    typedef struct
-    {
-    uint8_t    reg_1c;   ///< Value for register RF22_REG_1C_IF_FILTER_BANDWIDTH
-    uint8_t    reg_1f;   ///< Value for register RF22_REG_1F_CLOCK_RECOVERY_GEARSHIFT_OVERRIDE
-    uint8_t    reg_20;   ///< Value for register RF22_REG_20_CLOCK_RECOVERY_OVERSAMPLING_RATE
-    uint8_t    reg_21;   ///< Value for register RF22_REG_21_CLOCK_RECOVERY_OFFSET2 
-    uint8_t    reg_22;   ///< Value for register RF22_REG_22_CLOCK_RECOVERY_OFFSET1 
-    uint8_t    reg_23;   ///< Value for register RF22_REG_23_CLOCK_RECOVERY_OFFSET0
-    uint8_t    reg_24;   ///< Value for register RF22_REG_24_CLOCK_RECOVERY_TIMING_LOOP_GAIN1
-    uint8_t    reg_25;   ///< Value for register RF22_REG_25_CLOCK_RECOVERY_TIMING_LOOP_GAIN0 
-    uint8_t    reg_2c;   ///< Value for register RF22_REG_2C_OOK_COUNTER_VALUE_1 
-    uint8_t    reg_2d;   ///< Value for register RF22_REG_2D_OOK_COUNTER_VALUE_2
-    uint8_t    reg_2e;   ///< Value for register RF22_REG_2E_SLICER_PEAK_HOLD 
-    uint8_t    reg_58;   ///< Value for register RF22_REG_58_CHARGE_PUMP_CURRENT_TRIMMING
-    uint8_t    reg_69;   ///< Value for register RF22_REG_69_AGC_OVERRIDE1 
-    uint8_t    reg_6e;   ///< Value for register RF22_REG_6E_TX_DATA_RATE1
-    uint8_t    reg_6f;   ///< Value for register RF22_REG_6F_TX_DATA_RATE0 
-    uint8_t    reg_70;   ///< Value for register RF22_REG_70_MODULATION_CONTROL1
-    uint8_t    reg_71;   ///< Value for register RF22_REG_71_MODULATION_CONTROL2
-    uint8_t    reg_72;   ///< Value for register RF22_REG_72_FREQUENCY_DEVIATION
-    } ModemConfig;
-  
-    /// Choices for setModemConfig() for a selected subset of common modulation types,
-    /// and data rates. If you need another configuration, use the register calculator.
-    /// and call setModemRegisters() with your desired settings
-    /// These are indexes into _modemConfig
-    typedef enum
-    {
-    UnmodulatedCarrier = 0, ///< Unmodulated carrier for testing
-    FSK_PN9_Rb2Fd5,      ///< FSK, No Manchester, Rb = 2kbs, Fd = 5kHz, PN9 random modulation for testing
-
-    FSK_Rb2Fd5,         ///< FSK, No Manchester, Rb = 2kbs,    Fd = 5kHz
-    FSK_Rb2_4Fd36,       ///< FSK, No Manchester, Rb = 2.4kbs,  Fd = 36kHz
-    FSK_Rb4_8Fd45,       ///< FSK, No Manchester, Rb = 4.8kbs,  Fd = 45kHz
-    FSK_Rb9_6Fd45,       ///< FSK, No Manchester, Rb = 9.6kbs,  Fd = 45kHz
-    FSK_Rb19_2Fd9_6,     ///< FSK, No Manchester, Rb = 19.2kbs, Fd = 9.6kHz
-    FSK_Rb38_4Fd19_6,    ///< FSK, No Manchester, Rb = 38.4kbs, Fd = 19.6kHz
-    FSK_Rb57_6Fd28_8,    ///< FSK, No Manchester, Rb = 57.6kbs, Fd = 28.8kHz
-    FSK_Rb125Fd125,      ///< FSK, No Manchester, Rb = 125kbs,  Fd = 125kHz
-
-    GFSK_Rb2Fd5,         ///< GFSK, No Manchester, Rb = 2kbs,    Fd = 5kHz
-    GFSK_Rb2_4Fd36,      ///< GFSK, No Manchester, Rb = 2.4kbs,  Fd = 36kHz
-    GFSK_Rb4_8Fd45,      ///< GFSK, No Manchester, Rb = 4.8kbs,  Fd = 45kHz
-    GFSK_Rb9_6Fd45,      ///< GFSK, No Manchester, Rb = 9.6kbs,  Fd = 45kHz
-    GFSK_Rb19_2Fd9_6,    ///< GFSK, No Manchester, Rb = 19.2kbs, Fd = 9.6kHz
-    GFSK_Rb38_4Fd19_6,   ///< GFSK, No Manchester, Rb = 38.4kbs, Fd = 19.6kHz
-    GFSK_Rb57_6Fd28_8,   ///< GFSK, No Manchester, Rb = 57.6kbs, Fd = 28.8kHz
-    GFSK_Rb125Fd125,     ///< GFSK, No Manchester, Rb = 125kbs,  Fd = 125kHz
-
-    OOK_Rb1_2Bw75,       ///< OOK, No Manchester, Rb = 1.2kbs,  Rx Bandwidth = 75kHz
-    OOK_Rb2_4Bw335,      ///< OOK, No Manchester, Rb = 2.4kbs,  Rx Bandwidth = 335kHz
-    OOK_Rb4_8Bw335,      ///< OOK, No Manchester, Rb = 4.8kbs,  Rx Bandwidth = 335kHz
-    OOK_Rb9_6Bw335,      ///< OOK, No Manchester, Rb = 9.6kbs,  Rx Bandwidth = 335kHz
-    OOK_Rb19_2Bw335,     ///< OOK, No Manchester, Rb = 19.2kbs, Rx Bandwidth = 335kHz
-    OOK_Rb38_4Bw335,     ///< OOK, No Manchester, Rb = 38.4kbs, Rx Bandwidth = 335kHz
-    OOK_Rb40Bw335        ///< OOK, No Manchester, Rb = 40kbs,   Rx Bandwidth = 335kHz
-    } ModemConfigChoice;
 
     /// Constructor. You can have multiple instances, but each instance must have its own
     /// interrupt and slave select pin. After constructing, you must call init() to initialise the intnerface
@@ -126,7 +761,7 @@ public:
     /// \param[in] slaveSelectPin the Arduino pin number of the output to use to select the RF22 before
     /// accessing it. Defaults to the normal SS pin for your Arduino (D10 for Diecimila, Uno etc, D53 for Mega)
     /// \param[in] interrupt The interrupt number to use. Default is interrupt 0 (Arduino input pin 2)
-    RF22(PinName slaveSelectPin , PinName mosi, PinName miso, PinName sclk, PinName interrupt );
+    RFM69(PinName slaveSelectPin , PinName mosi, PinName miso, PinName sclk, PinName interrupt );
   
     /// Initialises this instance and the radio module connected to it.
     /// The following steps are taken:
@@ -139,10 +774,6 @@ public:
     /// - Sets the modem data rate to FSK_Rb2_4Fd36
     /// \return  true if everything was successful
     boolean        init();
-
-    /// Issues a software reset to the 
-    /// RF22 module. Blocks for 1ms to ensure the reset is complete.
-    void           reset();
 
     /// Reads a single register from the RF22
     /// \param[in] reg Register number, one of RF22_REG_*
@@ -166,42 +797,6 @@ public:
     /// \param[in] len Number of bytes to write
     void           spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len);
 
-    /// Reads and returns the device status register RF22_REG_02_DEVICE_STATUS
-    /// \return The value of the device status register
-    uint8_t        statusRead();
-  
-    /// Reads a value from the on-chip analog-digital converter
-    /// \param[in] adcsel Selects the ADC input to measure. One of RF22_ADCSEL_*. Defaults to the 
-    /// internal temperature sensor
-    /// \param[in] adcref Specifies the refernce voltage to use. One of RF22_ADCREF_*. 
-    /// Defaults to the internal bandgap voltage.
-    /// \param[in] adcgain Amplifier gain selection. 
-    /// \param[in] adcoffs Amplifier offseet (0 to 15).
-    /// \return The analog value. 0 to 255.
-    uint8_t        adcRead(uint8_t adcsel = RF22_ADCSEL_INTERNAL_TEMPERATURE_SENSOR,
-               uint8_t adcref = RF22_ADCREF_BANDGAP_VOLTAGE,
-               uint8_t adcgain = 0, 
-               uint8_t adcoffs = 0);
-
-    /// Reads the on-chip temperature sensoer
-    /// \param[in] tsrange Specifies the temperature range to use. One of RF22_TSRANGE_*
-    /// \param[in] tvoffs Specifies the temperature value offset. This is actually signed value 
-    /// added to the measured temperature value
-    /// \return The measured temperature.
-    uint8_t        temperatureRead(uint8_t tsrange = RF22_TSRANGE_M64_64C, uint8_t tvoffs = 0);   
-
-    /// Reads the wakeup timer value in registers RF22_REG_17_WAKEUP_TIMER_VALUE1 
-    /// and RF22_REG_18_WAKEUP_TIMER_VALUE2
-    /// \return The wakeup timer value 
-    uint16_t       wutRead();
-
-    /// Sets the wakeup timer period registers RF22_REG_14_WAKEUP_TIMER_PERIOD1,
-    /// RF22_REG_15_WAKEUP_TIMER_PERIOD2 and RF22_R<EG_16_WAKEUP_TIMER_PERIOD3
-    /// \param[in] wtm Wakeup timer mantissa value
-    /// \param[in] wtr Wakeup timer exponent R value
-    /// \param[in] wtd Wakeup timer exponent D value
-    void           setWutPeriod(uint16_t wtm, uint8_t wtr = 0, uint8_t wtd = 0);
-
     /// Sets the transmitter and receiver centre frequency
     /// \param[in] centre Frequency in MHz. 240.0 to 960.0. Caution, some versions of RF22 and derivatives 
     /// implemented more restricted frequency ranges.
@@ -209,17 +804,7 @@ public:
     /// for frequencies 240.0 to 480MHz, and 0.0 to 0.318750MHz for  frequencies 480.0 to 960MHz, 
     /// \return true if the selected frquency centre + (fhch * fhs) is within range and the afcPullInRange is within range
     boolean        setFrequency(float centre, float afcPullInRange = 0.05);
-
-    /// Sets the frequency hopping step size.
-    /// \param[in] fhs Frequency Hopping step size in 10kHz increments
-    /// \return true if centre + (fhch * fhs) is within limits
-    boolean        setFHStepSize(uint8_t fhs);
-
-    /// Sets the frequncy hopping channel. Adds fhch * fhs to centre frequency
-    /// \param[in] fhch The channel number
-    /// \return true if the selected frquency centre + (fhch * fhs) is within range
-    boolean        setFHChannel(uint8_t fhch);
-
+    
     /// Reads and returns the current RSSI value from register RF22_REG_26_RSSI. If you want to find the RSSI
     /// of the last received message, use lastRssi() instead.
     /// \return The current RSSI value 
@@ -238,7 +823,7 @@ public:
 
     /// If current mode is Rx or Tx changes it to Idle. If the transmitter or receiver is running, 
     /// disables them.
-    void           setModeIdle();
+    void           setModeSleep();
 
     /// If current mode is Tx or Idle, changes it to Rx. 
     /// Starts the receiver in the RF22.
@@ -260,32 +845,11 @@ public:
     /// \param[in] power Transmitter power level, one of RF22_TXPOW_*
     void           setTxPower(uint8_t power);
 
-    /// Sets all the registered required to configure the data modem in the RF22, including the data rate, 
-    /// bandwidths etc. You cas use this to configure the modem with custom configuraitons if none of the 
-    /// canned configurations in ModemConfigChoice suit you.
-    /// \param[in] config A ModemConfig structure containing values for the modem configuration registers.
-    void           setModemRegisters(const ModemConfig* config);
-
-    /// Select one of the predefined modem configurations. If you need a modem configuration not provided 
-    /// here, use setModemRegisters() with your own ModemConfig.
-    /// \param[in] index The configuration choice.
-    /// \return true if index is a valid choice.
-    boolean        setModemConfig(ModemConfigChoice index);
-
     /// Starts the receiver and checks whether a received message is available.
     /// This can be called multiple times in a timeout loop
     /// \return true if a complete, valid message has been received and is able to be retrieved by
     /// recv()
     boolean        available();
-
-    /// Starts the receiver and blocks until a valid received 
-    /// message is available.
-    void           waitAvailable();
-
-    /// Starts the receiver and blocks until a received message is available or a timeout
-    /// \param[in] timeout Maximum time to wait in milliseconds.
-    /// \return true if a message is available
-    bool           waitAvailableTimeout(uint16_t timeout);
 
     /// Turns the receiver on if it not already on.
     /// If there is a valid message available, copy it to buf and return true
@@ -306,59 +870,11 @@ public:
     /// \return true if the message length was valid and it was correctly queued for transmit
     boolean        send(const uint8_t* data, uint8_t len);
 
-    /// Blocks until the RF22 is not in mode RF22_MODE_TX (ie until the RF22 is not transmitting).
-    /// This effectively waits until any previous transmit packet is finished being transmitted.
-    void           waitPacketSent();
-  
-    /// Tells the receiver to accept messages with any TO address, not just messages
-    /// addressed to this node or the broadcast address
-    /// \param[in] promiscuous true if you wish to receive messages with any TO address
-    void           setPromiscuous(boolean promiscuous);
-
-    /// Returns the TO header of the last received message
-    /// \return The TO header
-    uint8_t        headerTo();
-
-    /// Returns the FROM header of the last received message
-    /// \return The FROM header
-    uint8_t        headerFrom();
-
-    /// Returns the ID header of the last received message
-    /// \return The ID header
-    uint8_t        headerId();
-
-    /// Returns the FLAGS header of the last received message
-    /// \return The FLAGS header
-    uint8_t        headerFlags();
-
     /// Returns the RSSI (Receiver Signal Strength Indicator)
     /// of the last received message. This measurement is taken when 
     /// the preamble has been received. It is a (non-linear) measure of the received signal strength.
     /// \return The RSSI
     uint8_t        lastRssi();
-
-    /// Prints a data buffer in HEX.
-    /// For diagnostic use
-    /// \param[in] prompt string to preface the print
-    /// \param[in] buf Location of the buffer to print
-    /// \param[in] len Length of the buffer in octets.
-    static void           printBuffer(const char* prompt, const uint8_t* buf, uint8_t len);
-
-    /// Sets the length of the preamble
-    /// in 4-bit nibbles. 
-    /// Caution: this should be set to the same 
-    /// value on all nodes in your network. Default is 8.
-    /// Sets the message preamble length in RF22_REG_34_PREAMBLE_LENGTH
-    /// \param[in] nibbles Preamble length in nibbles of 4 bits each.  
-    void           setPreambleLength(uint8_t nibbles);
-
-    /// Sets the sync words for transmit and receive in registers RF22_REG_36_SYNC_WORD3 
-    /// to RF22_REG_39_SYNC_WORD0
-    /// Caution: this should be set to the same 
-    /// value on all nodes in your network. Default is { 0x2d, 0xd4 }
-    /// \param[in] syncWords Array of sync words
-    /// \param[in] len Number of sync words to set
-    void           setSyncWords(const uint8_t* syncWords, uint8_t len);
 
 protected:
     /// This is a low level function to handle the interrupts for one instance of RF22.
@@ -386,54 +902,9 @@ protected:
     /// \return false if the resulting message would exceed RF22_MAX_MESSAGE_LEN, else true
     boolean           appendTxBuf(const uint8_t* data, uint8_t len);
 
-    /// Internal function to load the next fragment of 
-    /// the current message into the transmitter FIFO
-    /// Internal use only
-    void           sendNextFragment();
-
-    ///  function to copy the next fragment from 
-    /// the receiver FIF) into the receiver buffer
-    void           readNextFragment();
-
-    /// Clears the RF22 Rx and Tx FIFOs
-    /// Internal use only
-    void           resetFifos();
-
-    /// Clears the RF22 Rx FIFO
-    /// Internal use only
-    void           resetRxFifo();
-
-    /// Clears the RF22 Tx FIFO
-    /// Internal use only
-    void           resetTxFifo();
-
-    /// This function will be called by handleInterrupt() if an RF22 external interrupt occurs. 
-    /// This can only happen if external interrupts are enabled in the RF22 
-    /// (which they are not by default). 
-    /// Subclasses may override this function to get control when  an RF22 external interrupt occurs. 
-    virtual void   handleExternalInterrupt();
-
-    /// This function will be called by handleInterrupt() if an RF22 wakeup timer interrupt occurs. 
-    /// This can only happen if wakeup timer interrupts are enabled in the RF22 
-    /// (which they are not by default). 
-    /// Subclasses may override this function to get control when  an RF22 wakeup timer interrupt occurs. 
-    virtual void   handleWakeupTimerInterrupt();
-
-    /// Sets the TO header to be sent in all subsequent messages
-    /// \param[in] to The new TO header value
-    void           setHeaderTo(uint8_t to);
-
-    /// Sets the FROM header to be sent in all subsequent messages
-    /// \param[in] from The new FROM header value
-    void           setHeaderFrom(uint8_t from);
-
-    /// Sets the ID header to be sent in all subsequent messages
-    /// \param[in] id The new ID header value
-    void           setHeaderId(uint8_t id);
-
-    /// Sets the FLAGS header to be sent in all subsequent messages
-    /// \param[in] flags The new FLAGS header value
-    void           setHeaderFlags(uint8_t flags);
+    void        sendTxBuf();
+    
+    void        readRxBuf();
 
     /// Start the transmission of the contents 
     /// of the Tx buffer
@@ -453,10 +924,11 @@ protected:
     //static void         isr1();
 private:    
    
-    volatile uint8_t    _mode; // One of RF22_MODE_*
+    volatile uint8_t    _mode;
 
     uint8_t             _sleepMode;
     uint8_t             _idleMode;
+    uint8_t             _afterTxMode;
     DigitalOut          _slaveSelectPin;
     SPI                 _spi;
     InterruptIn         _interrupt;
@@ -464,7 +936,7 @@ private:
 
     // These volatile members may get changed in the interrupt service routine
     volatile uint8_t    _bufLen;
-    uint8_t             _buf[RF22_MAX_MESSAGE_LEN];
+    uint8_t             _buf[RFM69_MAX_MESSAGE_LEN];
 
     volatile boolean    _rxBufValid;
 

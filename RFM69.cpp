@@ -8,22 +8,23 @@
 
 #include "mbed.h"
 #include "RFM69.h"
+#include "RFM69Config.h"
 
 
 RFM69::RFM69(PinName slaveSelectPin, PinName mosi, PinName miso, PinName sclk, PinName interrupt)
     : _slaveSelectPin(slaveSelectPin),  _spi(mosi, miso, sclk), _interrupt(interrupt) /*, led1(LED1), led2(LED2), led3(LED3), led4(LED4) */
 {
-    _idleMode = RF69_MODE_SLEEP; // Default idle state is SLEEP, our lowest power mode
-    _mode = RF69_MODE_RX; // We start up in RX mode
+    _idleMode = RFM69_MODE_SLEEP; // Default idle state is SLEEP, our lowest power mode
+    _mode = RFM69_MODE_RX; // We start up in RX mode
     _rxGood = 0;
     _rxBad = 0;
     _txGood = 0;
-    _afterTxMode = RF69_MODE_RX;
+    _afterTxMode = RFM69_MODE_RX;
 }
 
 boolean RFM69::init()
 {
-    wait_ms(16);
+    wait_ms(12);
 
     _slaveSelectPin = 1; // Init nSS
 
@@ -46,9 +47,9 @@ boolean RFM69::init()
 
     setFrequency(869.5, 0.05);
 
-    setModemConfig(FSK_Rb2_4Fd36);
+//    setModemConfig(FSK_Rb2_4Fd36);
     // Minimum power
-    setTxPower(RF22_TXPOW_8DBM);
+//    setTxPower(RF22_TXPOW_8DBM);
 //    setTxPower(RF22_TXPOW_17DBM);
 
 
@@ -58,25 +59,24 @@ boolean RFM69::init()
 
 void RFM69::handleInterrupt()
 {
-    uint8_t _lastInterruptFlags[2];
-
     // RX
     if(_mode == RFM69_MODE_RX) {
     
         // CRCOK (incoming packet)
-        if(readReg(RFM69_REG_28_IRQFLAGS2) & RFM69_IRQFLAGS2_CRCOK) {
-            spiBurstRead(RFM69_REG_00_FIFO_ACCESS, _buf + _bufLen, len - _bufLen);
+        if(spiRead(RFM69_REG_28_IRQ_FLAGS2) & RF_IRQFLAGS2_CRCOK) {
+            spiBurstRead(RFM69_REG_00_FIFO, _buf + _bufLen, len - _bufLen);
             _rxGood++;
             _bufLen = len;
             _rxBufValid = true;
-        
+        }
     // TX
     } else if(_mode == RFM69_MODE_TX) {
     
         // PacketSent
-        if(readReg(RFM69_REG_28_IRQFLAGS2) & RFM69_IRQFLAGS2_PACKETSENT) {
+        if(spiRead(RFM69_REG_28_IRQ_FLAGS2) & RF_IRQFLAGS2_PACKETSENT) {
             _txGood++;
             setMode(_afterTxMode);
+            _txPacketSent = true;
         }
     }
 }
@@ -136,46 +136,37 @@ void RFM69::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
 uint8_t RFM69::rssiRead()
 {
     int rssi = 0;
-    if (forceTrigger) {
-        //RSSI trigger not needed if DAGC is in continuous mode
-        spiWrite(RFM69_REG_23_RSSI_CONFIG, RFM69_RSSI_START);
-        while ((spiRead(RFM69_REG_23_RSSI_CONFIG) & RFM69_RSSI_DONE) == 0x00); // Wait for RSSI_Ready
-    }
+    //RSSI trigger not needed if DAGC is in continuous mode
+    spiWrite(RFM69_REG_23_RSSI_CONFIG, RF_RSSI_START);
+    while ((spiRead(RFM69_REG_23_RSSI_CONFIG) & RF_RSSI_DONE) == 0x00); // Wait for RSSI_Ready, make this asynchronous sometime?
     rssi = -spiRead(RFM69_REG_24_RSSI_VALUE);
     rssi >>= 1;
     return rssi;
 }
 
-void RFM69::setMode(uint8_t newMode) // Converted
+void RFM69::setMode(uint8_t newMode)
 {
-    spiWrite(RFM69_REG_01_OPMODE, (readReg(RFM69_REG_01_OPMODE) & 0b11100011) | newMode);
+    spiWrite(RFM69_REG_01_OPMODE, (spiRead(RFM69_REG_01_OPMODE) & 0xE3) | newMode);
 	_mode = newMode;
+}
+void RFM69::setModeSleep()
+{
+    setMode(RFM69_MODE_SLEEP);
+}
+void RFM69::setModeRx()
+{
+    setMode(RFM69_MODE_RX);
+}
+void RFM69::setModeTx()
+{
+    setMode(RFM69_MODE_TX);
 }
 uint8_t  RFM69::mode()
 {
     return _mode;
 }
 
-void RFM69::setTxPower(uint8_t power)
-{
-    spiWrite(RF22_REG_6D_TX_POWER, power);
-}
-
-// Set one of the canned FSK Modem configs
-// Returns true if its a valid choice
-boolean RF22::setModemConfig(ModemConfigChoice index)
-{
-    if (index > (sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig)))
-        return false;
-
-    RF22::ModemConfig cfg;
-    memcpy(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RF22::ModemConfig));
-    setModemRegisters(&cfg);
-
-    return true;
-}
-
-void RF22::clearRxBuf()
+void RFM69::clearRxBuf()
 {
     __disable_irq();    // Disable Interrupts
     _bufLen = 0;
@@ -183,14 +174,14 @@ void RF22::clearRxBuf()
     __enable_irq();     // Enable Interrupts
 }
 
-boolean RF22::available()
+boolean RFM69::available()
 {
     if (!_rxBufValid)
         setMode(RFM69_MODE_RX); // Make sure we are receiving - Do we need this?
     return _rxBufValid;
 }
 
-boolean RF22::recv(uint8_t* buf, uint8_t* len)
+boolean RFM69::recv(uint8_t* buf, uint8_t* len)
 {
     if (!available())
         return false;
@@ -200,12 +191,10 @@ boolean RF22::recv(uint8_t* buf, uint8_t* len)
     memcpy(buf, _buf, *len);
     clearRxBuf();
     __enable_irq();     // Enable Interrupts
-//    printBuffer("recv:", buf, *len);
-//    }
     return true;
 }
 
-void RF22::clearTxBuf()
+void RFM69::clearTxBuf()
 {
     __disable_irq();    // Disable Interrupts
     _bufLen = 0;
@@ -214,44 +203,25 @@ void RF22::clearTxBuf()
     __enable_irq();     // Enable Interrupts
 }
 
-void RF22::startTransmit()
+void RFM69::startTransmit()
 {
-    sendNextFragment(); // Actually the first fragment
-    spiWrite(RF22_REG_3E_PACKET_LENGTH, _bufLen); // Total length that will be sent
+    //sendNextFragment(); // Actually the first fragment
     setModeTx(); // Start the transmitter, turns off the receiver
+    sendTxBuf();
 }
 
-// Restart the transmission of a packet that had a problem
-void RF22::restartTransmit()
+boolean RFM69::send(const uint8_t* data, uint8_t len)
 {
-    _mode = RF22_MODE_IDLE;
-    _txBufSentIndex = 0;
-//        Serial.println("Restart");
-    startTransmit();
-}
-
-boolean RF22::send(const uint8_t* data, uint8_t len)
-{
-    waitPacketSent();
 //    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
         if (!fillTxBuf(data, len))
             return false;
         startTransmit();
     }
-//    printBuffer("send:", data, len);
     return true;
 }
 
-boolean RF22::fillTxBuf(const uint8_t* data, uint8_t len)
-{
-    //clearTxBuf();
-    if (!len)
-        return false;
-    return appendTxBuf(data, len);
-}
-
-boolean RF22::appendTxBuf(const uint8_t* data, uint8_t len)
+boolean RFM69::fillTxBuf(const uint8_t* data, uint8_t len)
 {
     if (((uint16_t)_bufLen + len) > RFM69_MAX_MESSAGE_LEN)
         return false;
@@ -259,38 +229,24 @@ boolean RF22::appendTxBuf(const uint8_t* data, uint8_t len)
     memcpy(_buf + _bufLen, data, len);
     _bufLen += len;
     __enable_irq();     // Enable Interrupts
-
-//    printBuffer("txbuf:", _buf, _bufLen);
     return true;
 }
 
-// Assumption: there is currently <= RF22_TXFFAEM_THRESHOLD bytes in the Tx FIFO
-void RF22::sendNextFragment()
-{
-    if (_txBufSentIndex < _bufLen) {
-        // Some left to send?
-        uint8_t len = _bufLen - _txBufSentIndex;
-        // But dont send too much
-        if (len > (RF22_FIFO_SIZE - RF22_TXFFAEM_THRESHOLD - 1))
-            len = (RF22_FIFO_SIZE - RF22_TXFFAEM_THRESHOLD - 1);
-        spiBurstWrite(RF22_REG_7F_FIFO_ACCESS, _buf + _txBufSentIndex, len);
-        _txBufSentIndex += len;
+void RFM69::sendTxBuf() {
+    if(_bufLen<RFM69_FIFO_SIZE) {
+        uint8_t len = _bufLen;
+        spiWrite(RFM69_REG_00_FIFO, len); // Send length byte
+        spiBurstWrite(RFM69_REG_00_FIFO, _buf, len);
     }
 }
 
-// Assumption: there are at least RF22_RXFFAFULL_THRESHOLD in the RX FIFO
-// That means it should only be called after a RXFFAFULL interrupt
-void RF22::readNextFragment()
+void RFM69::readRxBuf()
 {
-    if (((uint16_t)_bufLen + RF22_RXFFAFULL_THRESHOLD) > RF22_MAX_MESSAGE_LEN)
-        return; // Hmmm receiver overflow. Should never occur
-
-    // Read the RF22_RXFFAFULL_THRESHOLD octets that should be there
-    spiBurstRead(RF22_REG_7F_FIFO_ACCESS, _buf + _bufLen, RF22_RXFFAFULL_THRESHOLD);
-    _bufLen += RF22_RXFFAFULL_THRESHOLD;
+    spiBurstRead(RFM69_REG_00_FIFO, _buf, RFM69_FIFO_SIZE);
+    _bufLen += RFM69_FIFO_SIZE;
 }
 
-uint8_t RF22::lastRssi()
+uint8_t RFM69::lastRssi()
 {
     return _lastRssi;
 }
