@@ -10,7 +10,6 @@
 #include "RFM69.h"
 #include "RFM69Config.h"
 
-
 RFM69::RFM69(PinName slaveSelectPin, PinName mosi, PinName miso, PinName sclk, PinName interrupt)
     : _slaveSelectPin(slaveSelectPin),  _spi(mosi, miso, sclk), _interrupt(interrupt) /*, led1(LED1), led2(LED2), led3(LED3), led4(LED4) */
 {
@@ -32,27 +31,18 @@ boolean RFM69::init()
 
     _spi.format(8,0);
     _spi.frequency(1000000); // 1MHz (increase to 10MHz after testing)
+    
+    // Set up device
+    setMode(_mode);
+    for (uint8_t i = 0; CONFIG[i][0] != 255; i++)
+        spiWrite(CONFIG[i][0], CONFIG[i][1]);
 
     // We should check for a device here, maybe set and check mode?
     
-    _interrupt.fall(this, &RFM69::isr0);
+    _interrupt.rise(this, &RFM69::isr0);
 
     clearTxBuf();
     clearRxBuf();
-
-
-    // Set up GPIOs
-    spiWrite(RFM69_REG_25_DIO_MAPPING1, 0x00); // Set DIO Mapping to default
-    spiWrite(RFM69_REG_26_DIO_MAPPING2, RFM69_CLKOUT_OFF); // Switch off Clkout
-
-    setFrequency(869.5, 0.05);
-
-//    setModemConfig(FSK_Rb2_4Fd36);
-    // Minimum power
-//    setTxPower(RF22_TXPOW_8DBM);
-//    setTxPower(RF22_TXPOW_17DBM);
-
-
 
     return true;
 }
@@ -64,9 +54,9 @@ void RFM69::handleInterrupt()
     
         // CRCOK (incoming packet)
         if(spiRead(RFM69_REG_28_IRQ_FLAGS2) & RF_IRQFLAGS2_CRCOK) {
-            spiBurstRead(RFM69_REG_00_FIFO, _buf + _bufLen, len - _bufLen);
+            spiBurstRead(RFM69_REG_00_FIFO, _buf, RFM69_FIFO_SIZE); // Read out full fifo
             _rxGood++;
-            _bufLen = len;
+            _bufLen = _buf[0]+1; // Length byte given as first character?
             _rxBufValid = true;
         }
     // TX
@@ -212,6 +202,7 @@ void RFM69::startTransmit()
 
 boolean RFM69::send(const uint8_t* data, uint8_t len)
 {
+    clearTxBuf();
 //    ATOMIC_BLOCK(ATOMIC_RESTORESTATE)
     {
         if (!fillTxBuf(data, len))

@@ -15,7 +15,7 @@
     { RFM69_REG_06_FDEV_LSB,    0x31},
 
     { RFM69_REG_07_FRF_MSB,     0xD9 }, // 869.5 MHz
-    { RFM69_REG_08_FRF_MID,     0x80 },
+    { RFM69_REG_08_FRF_MID,     0x60 }, // calculated: 0x80?
     { RFM69_REG_09_FRF_LSB,     0x12 },
     
     // PA Settings
@@ -26,16 +26,17 @@
     
     { RFM69_REG_13_OCP,         RF_OCP_ON | RF_OCP_TRIM_95 },
     
-    //{ RFM69_REG_18_LNA,       RF_LNA_ZIN_50 }, // Default is 200 ohm?
+    { RFM69_REG_18_LNA,         RF_LNA_ZIN_200 }, // 50 ohm for matched antenna
     
-    { RFM69_REG_19_RX_BW,       RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_24 | RF_RXBW_EXP_5} // Rx Bandwidth: 10.4kHz
-    { RFM69_REG_25_DIO_MAPPING1, RF_DIOMAPPING1_DIO0_01 }, // DIO0 RX: PayloadReady TX: TXReady
+    { RFM69_REG_19_RX_BW,       RF_RXBW_DCCFREQ_010 | RF_RXBW_MANT_24 | RF_RXBW_EXP_5}, // Rx Bandwidth: 10.4kHz
+    { RFM69_REG_25_DIO_MAPPING1, RF_DIOMAPPING1_DIO0_00 }, // DIO0 RX: PayloadReady TX: PacketSent
+    { RFM69_REG_26_DIO_MAPPING2, RF_DIOMAPPING2_CLKOUT_OFF }, // Switch off Clkout
     
     // { RFM69_REG_2D_PREAMBLE_LSB, RF_PREAMBLESIZE_LSB_VALUE } // default 3 preamble bytes 0xAAAAAA
     
     { RFM69_REG_2E_SYNC_CONFIG, RF_SYNC_OFF }, // Sync bytes off
     { RFM69_REG_37_PACKET_CONFIG1, RF_PACKET1_FORMAT_VARIABLE | RF_PACKET1_DCFREE_OFF | RF_PACKET1_CRC_ON | RF_PACKET1_CRCAUTOCLEAR_ON | RF_PACKET1_ADRSFILTERING_OFF },
-    { RFM69_REG_38_PAYLOAD_LENGTH, 66 }, // Full FIFO size for rx packet
+    { RFM69_REG_38_PAYLOAD_LENGTH, RFM69_FIFO_SIZE }, // Full FIFO size for rx packet
     { RFM69_REG_3C_FIFO_THRESHOLD, RF_FIFOTHRESH_TXSTART_FIFONOTEMPTY | RF_FIFOTHRESH_VALUE }, //TX on FIFO not empty
     { RFM69_REG_3D_PACKET_CONFIG2, RF_PACKET2_RXRESTARTDELAY_2BITS | RF_PACKET2_AUTORXRESTART_ON | RF_PACKET2_AES_OFF }, //RXRESTARTDELAY must match transmitter PA ramp-down time (bitrate dependent)
     { RFM69_REG_6F_TEST_DAGC, RF_DAGC_IMPROVED_LOWBETA0 }, // run DAGC continuously in RX mode, recommended default for AfcLowBetaOn=0
