@@ -10,6 +10,7 @@
 #include "RFM69.h"
 #include "RFM69Config.h"
 
+
 RFM69::RFM69(PinName slaveSelectPin, PinName mosi, PinName miso, PinName sclk, PinName interrupt)
     : _slaveSelectPin(slaveSelectPin),  _spi(mosi, miso, sclk), _interrupt(interrupt) /*, led1(LED1), led2(LED2), led3(LED3), led4(LED4) */
 {
@@ -30,12 +31,13 @@ boolean RFM69::init()
     wait_ms(100);
 
     _spi.format(8,0);
-    _spi.frequency(1000000); // 1MHz (increase to 10MHz after testing)
+    _spi.frequency(10000000); // 10MHz
     
     // Set up device
-    setMode(_mode);
     for (uint8_t i = 0; CONFIG[i][0] != 255; i++)
         spiWrite(CONFIG[i][0], CONFIG[i][1]);
+    
+    setMode(_mode);
 
     // We should check for a device here, maybe set and check mode?
     
@@ -51,12 +53,12 @@ void RFM69::handleInterrupt()
 {
     // RX
     if(_mode == RFM69_MODE_RX) {
-    
-        // CRCOK (incoming packet)
-        if(spiRead(RFM69_REG_28_IRQ_FLAGS2) & RF_IRQFLAGS2_CRCOK) {
+        //_lastRssi = rssiRead();
+        // PAYLOADREADY (incoming packet)
+        if(spiRead(RFM69_REG_28_IRQ_FLAGS2) & RF_IRQFLAGS2_PAYLOADREADY) {
+            _bufLen = spiRead(RFM69_REG_00_FIFO)+1;
             spiBurstRead(RFM69_REG_00_FIFO, _buf, RFM69_FIFO_SIZE); // Read out full fifo
             _rxGood++;
-            _bufLen = _buf[0]+1; // Length byte given as first character?
             _rxBufValid = true;
         }
     // TX
@@ -65,6 +67,7 @@ void RFM69::handleInterrupt()
         // PacketSent
         if(spiRead(RFM69_REG_28_IRQ_FLAGS2) & RF_IRQFLAGS2_PACKETSENT) {
             _txGood++;
+            spiWrite(RFM69_REG_25_DIO_MAPPING1, RF_DIOMAPPING1_DIO0_01);
             setMode(_afterTxMode);
             _txPacketSent = true;
         }
@@ -123,12 +126,10 @@ void RFM69::spiBurstWrite(uint8_t reg, const uint8_t* src, uint8_t len)
     _slaveSelectPin = 1;
 }
 
-uint8_t RFM69::rssiRead()
+int RFM69::rssiRead()
 {
     int rssi = 0;
     //RSSI trigger not needed if DAGC is in continuous mode
-    spiWrite(RFM69_REG_23_RSSI_CONFIG, RF_RSSI_START);
-    while ((spiRead(RFM69_REG_23_RSSI_CONFIG) & RF_RSSI_DONE) == 0x00); // Wait for RSSI_Ready, make this asynchronous sometime?
     rssi = -spiRead(RFM69_REG_24_RSSI_VALUE);
     rssi >>= 1;
     return rssi;
@@ -166,8 +167,6 @@ void RFM69::clearRxBuf()
 
 boolean RFM69::available()
 {
-    if (!_rxBufValid)
-        setMode(RFM69_MODE_RX); // Make sure we are receiving - Do we need this?
     return _rxBufValid;
 }
 
@@ -209,6 +208,7 @@ boolean RFM69::send(const uint8_t* data, uint8_t len)
             return false;
         startTransmit();
     }
+    spiWrite(RFM69_REG_25_DIO_MAPPING1, RF_DIOMAPPING1_DIO0_00);
     return true;
 }
 
@@ -225,9 +225,14 @@ boolean RFM69::fillTxBuf(const uint8_t* data, uint8_t len)
 
 void RFM69::sendTxBuf() {
     if(_bufLen<RFM69_FIFO_SIZE) {
+        uint8_t* src = _buf;
         uint8_t len = _bufLen;
-        spiWrite(RFM69_REG_00_FIFO, len); // Send length byte
-        spiBurstWrite(RFM69_REG_00_FIFO, _buf, len);
+        _slaveSelectPin = 0;
+	    _spi.write(RFM69_REG_00_FIFO | RFM69_SPI_WRITE_MASK); // Send the start address with the write mask on
+	    _spi.write(len);
+    	while (len--)
+        	_spi.write(*src++);
+	    _slaveSelectPin = 1;
     }
 }
 
@@ -237,7 +242,7 @@ void RFM69::readRxBuf()
     _bufLen += RFM69_FIFO_SIZE;
 }
 
-uint8_t RFM69::lastRssi()
+int RFM69::lastRssi()
 {
     return _lastRssi;
 }
